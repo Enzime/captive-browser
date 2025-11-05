@@ -8,4 +8,4 @@ require (
 	github.com/godbus/dbus v4.1.0+incompatible
 )
 
-require golang.org/x/net v0.37.0 // indirect
+require golang.org/x/net v0.38.0 // indirect
