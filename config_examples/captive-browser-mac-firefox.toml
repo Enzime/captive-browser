@@ -1,0 +1,54 @@
+# browser is the shell (/bin/sh) command executed once the proxy starts.
+# When browser exits, the proxy exits. An extra env var PROXY is available.
+#
+# Here, we use Firefox in Private Browsing mode with a dedicated profile.
+# Unlike Chrome, Firefox requires proxy settings in a user.js file within
+# the profile directory. This command creates the profile and configures
+# the SOCKS5 proxy automatically.
+#
+# The key setting is network.proxy.socks_remote_dns which ensures DNS
+# queries go through the SOCKS proxy (using the DHCP DNS server).
+browser = """
+    PROFILE_DIR="$HOME/Library/Application Support/Firefox/CaptivePortal" && \
+    mkdir -p "$PROFILE_DIR" && \
+    cat > "$PROFILE_DIR/user.js" << 'EOF'
+// Proxy settings - route through SOCKS5
+user_pref("network.proxy.type", 1);
+user_pref("network.proxy.socks", "localhost");
+user_pref("network.proxy.socks_port", 1666);
+user_pref("network.proxy.socks_version", 5);
+user_pref("network.proxy.socks_remote_dns", true);
+user_pref("network.proxy.no_proxies_on", "");
+
+// Disable default browser check and telemetry
+user_pref("browser.shell.checkDefaultBrowser", false);
+user_pref("datareporting.policy.dataSubmissionEnabled", false);
+user_pref("toolkit.telemetry.enabled", false);
+user_pref("toolkit.telemetry.unified", false);
+
+// Disable auto-updates and background connections
+user_pref("app.update.enabled", false);
+user_pref("browser.safebrowsing.downloads.enabled", false);
+user_pref("browser.safebrowsing.malware.enabled", false);
+user_pref("browser.safebrowsing.phishing.enabled", false);
+user_pref("extensions.update.enabled", false);
+user_pref("network.captive-portal-service.enabled", false);
+EOF
+    /Applications/Firefox.app/Contents/MacOS/firefox \
+    --profile "$PROFILE_DIR" \
+    --private-window \
+    http://example.com
+"""
+
+# dhcp-dns is the shell (/bin/sh) command executed to obtain the DHCP
+# DNS server address. The first match of an IPv4 regex is used.
+# IPv4 only, because let's be real, it's a captive portal.
+dhcp-dns = "ipconfig getoption en0 domain_name_server"
+
+# socks5-addr is the listen address for the SOCKS5 proxy server.
+socks5-addr = "localhost:1666"
+
+# ProTip: to disable the insecure system captive browser see here:
+# https://github.com/drduh/macOS-Security-and-Privacy-Guide#captive-portal
+# If that doesn't work, disable SIP (remember to re-enable it), and
+# rename "/System/Library/CoreServices/Captive Network Assistant.app".
