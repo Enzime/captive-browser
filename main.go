@@ -119,7 +119,11 @@ func main() {
 		if err != nil {
 			log.Fatalln("Browser auto-detection failed:", err)
 		}
-		log.Printf("Detected %s at %s", browser.Type, browser.Executable)
+		if browser.IsDefault {
+			log.Printf("Using default browser: %s (%s)", browser.Type, browser.Executable)
+		} else {
+			log.Printf("Using %s (%s)", browser.Type, browser.Executable)
+		}
 
 		browserCmd, err = buildBrowserCommand(browser, conf.SOCKS5Addr)
 		if err != nil {

@@ -36,11 +36,131 @@ func (b BrowserType) String() string {
 type BrowserInfo struct {
 	Type       BrowserType
 	Executable string
+	IsDefault  bool // true if this was detected as the system default browser
 }
 
 // detectBrowser attempts to find an installed browser
-// It checks for Chrome, Chromium, and Firefox in that order
+// It first tries to detect the system's default browser, then falls back to
+// checking for Chrome, Chromium, and Firefox in that order
 func detectBrowser() (*BrowserInfo, error) {
+	// First, try to detect the default browser
+	if browser := detectDefaultBrowser(); browser != nil {
+		browser.IsDefault = true
+		return browser, nil
+	}
+
+	// Fall back to checking browsers in order
+	return detectBrowserFallback()
+}
+
+// detectDefaultBrowser attempts to find the system's default web browser
+func detectDefaultBrowser() *BrowserInfo {
+	if runtime.GOOS == "darwin" {
+		return detectDefaultBrowserMacOS()
+	}
+	return detectDefaultBrowserLinux()
+}
+
+// detectDefaultBrowserLinux uses xdg-settings to find the default browser
+func detectDefaultBrowserLinux() *BrowserInfo {
+	// Try xdg-settings first
+	out, err := exec.Command("xdg-settings", "get", "default-web-browser").Output()
+	if err != nil {
+		// Try xdg-mime as fallback
+		out, err = exec.Command("xdg-mime", "query", "default", "x-scheme-handler/http").Output()
+		if err != nil {
+			return nil
+		}
+	}
+
+	desktop := strings.TrimSpace(string(out))
+	desktop = strings.ToLower(desktop)
+
+	// Map .desktop file to browser type and find executable
+	switch {
+	case strings.Contains(desktop, "firefox"):
+		if path, err := exec.LookPath("firefox"); err == nil {
+			return &BrowserInfo{Type: BrowserFirefox, Executable: path}
+		}
+		if path, err := exec.LookPath("firefox-esr"); err == nil {
+			return &BrowserInfo{Type: BrowserFirefox, Executable: path}
+		}
+	case strings.Contains(desktop, "google-chrome"):
+		if path, err := exec.LookPath("google-chrome"); err == nil {
+			return &BrowserInfo{Type: BrowserChrome, Executable: path}
+		}
+		if path, err := exec.LookPath("google-chrome-stable"); err == nil {
+			return &BrowserInfo{Type: BrowserChrome, Executable: path}
+		}
+	case strings.Contains(desktop, "chromium"):
+		if path, err := exec.LookPath("chromium"); err == nil {
+			return &BrowserInfo{Type: BrowserChromium, Executable: path}
+		}
+		if path, err := exec.LookPath("chromium-browser"); err == nil {
+			return &BrowserInfo{Type: BrowserChromium, Executable: path}
+		}
+	}
+
+	return nil
+}
+
+// detectDefaultBrowserMacOS finds the default browser on macOS
+func detectDefaultBrowserMacOS() *BrowserInfo {
+	// Use the 'defaults' command to read the default browser bundle ID
+	// from the launch services preferences
+	out, err := exec.Command("defaults", "read",
+		"com.apple.LaunchServices/com.apple.launchservices.secure",
+		"LSHandlers").Output()
+	if err != nil {
+		return nil
+	}
+
+	output := strings.ToLower(string(out))
+
+	// Look for the http handler entry and extract the bundle ID
+	// The output is a plist-style array, we look for LSHandlerURLScheme = http
+	// and its corresponding LSHandlerRoleAll
+
+	// Simple heuristic: check which browser bundle ID appears after "http"
+	httpIdx := strings.Index(output, `"lshandlerurlscheme" = "http"`)
+	if httpIdx == -1 {
+		httpIdx = strings.Index(output, `lshandlerurlscheme = http`)
+	}
+
+	if httpIdx != -1 {
+		// Look in the surrounding context for the bundle ID
+		searchArea := output[max(0, httpIdx-200):min(len(output), httpIdx+200)]
+
+		switch {
+		case strings.Contains(searchArea, "org.mozilla.firefox"):
+			if _, err := os.Stat("/Applications/Firefox.app"); err == nil {
+				return &BrowserInfo{
+					Type:       BrowserFirefox,
+					Executable: "/Applications/Firefox.app/Contents/MacOS/firefox",
+				}
+			}
+		case strings.Contains(searchArea, "com.google.chrome"):
+			if _, err := os.Stat("/Applications/Google Chrome.app"); err == nil {
+				return &BrowserInfo{
+					Type:       BrowserChrome,
+					Executable: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+				}
+			}
+		case strings.Contains(searchArea, "org.chromium.chromium"):
+			if _, err := os.Stat("/Applications/Chromium.app"); err == nil {
+				return &BrowserInfo{
+					Type:       BrowserChromium,
+					Executable: "/Applications/Chromium.app/Contents/MacOS/Chromium",
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// detectBrowserFallback checks for browsers in a fixed order
+func detectBrowserFallback() (*BrowserInfo, error) {
 	var candidates []struct {
 		browserType BrowserType
 		names       []string
