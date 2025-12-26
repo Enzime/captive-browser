@@ -1,33 +1,39 @@
 # browser is the shell (/bin/sh) command executed once the proxy starts.
 # When browser exits, the proxy exits. An extra env var PROXY is available.
 #
-# Here, we use a separate Chrome instance in Incognito mode, so that
-# it can run (and be waited for) alongside the default one, and that
-# it maintains no state across runs. To configure this browser open a
-# normal window in it, settings will be preserved.
+# Set to "auto" or leave empty to auto-detect Chrome, Chromium, or Firefox.
+# The browser will be launched with appropriate proxy and privacy settings.
+browser = "auto"
+
+# Alternatively, you can specify a custom browser command. Here's an example
+# using a separate Chrome instance in Incognito mode, so that it can run
+# (and be waited for) alongside the default one, and maintains no state
+# across runs. To configure this browser open a normal window in it,
+# settings will be preserved.
 #
 # It's also possible to use chromium instead of google-chrome by replacing
-# the progam name in the command below
-browser = """
-    google-chrome \
-    --user-data-dir="$HOME/.chromium-captive" \
-    --proxy-server="socks5://$PROXY" \
-    --proxy-bypass-list="<-loopback>" \
-    --no-first-run \
-    --new-window \
-    --incognito \
-    --no-default-browser-check \
-    --no-crash-upload \
-    --disable-extensions \
-    --disable-sync \
-    --disable-background-networking \
-    --disable-client-side-phishing-detection \
-    --disable-component-update \
-    --disable-translate \
-    --disable-web-resources \
-    --safebrowsing-disable-auto-update \
-    http://example.com
-"""
+# the program name in the command below.
+#
+# browser = """
+#     google-chrome \
+#     --user-data-dir="$HOME/.chromium-captive" \
+#     --proxy-server="socks5://$PROXY" \
+#     --proxy-bypass-list="<-loopback>" \
+#     --no-first-run \
+#     --new-window \
+#     --incognito \
+#     --no-default-browser-check \
+#     --no-crash-upload \
+#     --disable-extensions \
+#     --disable-sync \
+#     --disable-background-networking \
+#     --disable-client-side-phishing-detection \
+#     --disable-component-update \
+#     --disable-translate \
+#     --disable-web-resources \
+#     --safebrowsing-disable-auto-update \
+#     http://example.com
+# """
 
 # dhcp-dns is the shell (/bin/sh) command executed to obtain the DHCP
 # DNS server address. The first match of an IPv4 regex is used.

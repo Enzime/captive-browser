@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/BurntSushi/toml"
-	"github.com/armon/go-socks5"
 	"log"
 	"net"
 	"os"
@@ -11,6 +9,10 @@ import (
 	"os/user"
 	"path/filepath"
 	"regexp"
+	"strings"
+
+	"github.com/BurntSushi/toml"
+	"github.com/armon/go-socks5"
 )
 
 type UpstreamResolver struct {
@@ -109,8 +111,24 @@ func main() {
 		log.Fatalln(srv.ListenAndServe("tcp", conf.SOCKS5Addr))
 	}()
 
+	// Determine the browser command to use
+	browserCmd := conf.Browser
+	if browserCmd == "" || strings.ToLower(strings.TrimSpace(browserCmd)) == "auto" {
+		log.Printf("Auto-detecting browser...")
+		browser, err := detectBrowser()
+		if err != nil {
+			log.Fatalln("Browser auto-detection failed:", err)
+		}
+		log.Printf("Detected %s at %s", browser.Type, browser.Executable)
+
+		browserCmd, err = buildBrowserCommand(browser, conf.SOCKS5Addr)
+		if err != nil {
+			log.Fatalln("Failed to build browser command:", err)
+		}
+	}
+
 	log.Printf("Starting browser...")
-	cmd := exec.Command("/bin/sh", "-c", conf.Browser)
+	cmd := exec.Command("/bin/sh", "-c", browserCmd)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = append(os.Environ(), "PROXY="+conf.SOCKS5Addr)
